@@ -1,8 +1,7 @@
+```tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-
-type TaskStatus = "Pendiente" | "En progreso" | "Completada";
 
 type Task = {
   id: number;
@@ -10,18 +9,10 @@ type Task = {
   category: string;
   date: string;
   stores: number;
-  status: TaskStatus;
+  status: "Pendiente" | "En progreso" | "Completada";
 };
 
 const initialTasks: Task[] = [];
-
-const stores = [
-  "Todas las tiendas",
-  "Madrid Centro",
-  "Barcelona Diagonal",
-  "Valencia Centro",
-  "Sevilla Nervión",
-];
 
 const categories = [
   "Todas las categorías",
@@ -45,39 +36,24 @@ function normalizeDate(date: string | null | undefined) {
   return String(date).slice(0, 10);
 }
 
-function normalizeStatus(status: string | null | undefined): TaskStatus {
-  if (
-    status === "Pendiente" ||
-    status === "En progreso" ||
-    status === "Completada"
-  ) {
-    return status;
-  }
-
-  return "Pendiente";
-}
-
 export default function Home() {
   const [activeSection, setActiveSection] = useState("Calendario");
 
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
 
-  const [selectedStore, setSelectedStore] =
-    useState("Todas las tiendas");
-
-  const [selectedCategory, setSelectedCategory] =
-    useState("Todas las categorías");
+  const [selectedCategory, setSelectedCategory] = useState(
+    "Todas las categorías",
+  );
 
   const [showModal, setShowModal] = useState(false);
 
-  const [selectedTask, setSelectedTask] =
-    useState<Task | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newDate, setNewDate] = useState("2026-08-20");
   const [newCategory, setNewCategory] = useState("Operaciones");
-  const [newStores, setNewStores] = useState<string[]>([]);
+  const [newStores, setNewStores] = useState("1");
 
   /*
    * CARGAR TAREAS DESDE LA API
@@ -98,8 +74,8 @@ export default function Home() {
           title: task.title,
           category: task.category,
           date: normalizeDate(task.due_date),
-          stores: Number(task.stores) || 1,
-          status: normalizeStatus(task.status),
+          stores: task.stores ?? 1,
+          status: task.status ?? "Pendiente",
         }));
 
         setTasks(loadedTasks);
@@ -112,30 +88,16 @@ export default function Home() {
   }, []);
 
   /*
-   * FILTROS
+   * FILTRO POR CATEGORÍA
    */
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
-      const categoryMatches =
+      return (
         selectedCategory === "Todas las categorías" ||
-        task.category === selectedCategory;
-
-      /*
-       * La base de datos guarda actualmente el número
-       * de tiendas asignadas a cada tarea.
-       *
-       * Por tanto, mientras no tengamos una relación
-       * entre tareas y tiendas concretas, el filtro de
-       * tienda solo puede comprobar si la tarea tiene
-       * alguna tienda asignada.
-       */
-      const storeMatches =
-        selectedStore === "Todas las tiendas" ||
-        task.stores > 0;
-
-      return categoryMatches && storeMatches;
+        task.category === selectedCategory
+      );
     });
-  }, [tasks, selectedCategory, selectedStore]);
+  }, [tasks, selectedCategory]);
 
   /*
    * CALENDARIO AGOSTO 2026
@@ -160,6 +122,11 @@ export default function Home() {
   async function createTask() {
     if (!newTitle.trim()) return;
 
+    const storesNumber = Math.max(
+      1,
+      Number.parseInt(newStores, 10) || 1,
+    );
+
     try {
       const response = await fetch("/api/tasks", {
         method: "POST",
@@ -171,9 +138,7 @@ export default function Home() {
           description: newDescription.trim(),
           dueDate: newDate,
           category: newCategory,
-
-          // Guardamos en la BD el número de tiendas seleccionadas.
-          stores: newStores.length || 1,
+          stores: storesNumber,
         }),
       });
 
@@ -188,8 +153,8 @@ export default function Home() {
         title: createdTask.title,
         category: createdTask.category,
         date: normalizeDate(createdTask.due_date),
-        stores: Number(createdTask.stores) || 1,
-        status: normalizeStatus(createdTask.status),
+        stores: createdTask.stores ?? storesNumber,
+        status: createdTask.status ?? "Pendiente",
       };
 
       setTasks((current) => [...current, task]);
@@ -200,22 +165,11 @@ export default function Home() {
       setNewDescription("");
       setNewDate("2026-08-20");
       setNewCategory("Operaciones");
-      setNewStores([]);
+      setNewStores("1");
     } catch (error) {
-      console.error("Error creando tarea:", error);
+      console.error(error);
       alert("No se pudo crear la tarea");
     }
-  }
-
-  /*
-   * SELECCIONAR / DESELECCIONAR TIENDA
-   */
-  function toggleStore(store: string) {
-    setNewStores((current) =>
-      current.includes(store)
-        ? current.filter((item) => item !== store)
-        : [...current, store],
-    );
   }
 
   return (
@@ -234,27 +188,29 @@ export default function Home() {
           </div>
 
           <nav className="space-y-1">
-            {[
-              ["📅", "Calendario"],
-              ["✓", "Tareas"],
-              ["⌂", "Tiendas"],
-            ].map(([icon, label]) => (
-              <button
-                key={label}
-                onClick={() => setActiveSection(label)}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                  activeSection === label
-                    ? "bg-zinc-900 text-white"
-                    : "text-zinc-600 hover:bg-zinc-100"
-                }`}
-              >
-                <span className="w-5 text-center">
-                  {icon}
-                </span>
+            <button
+              onClick={() => setActiveSection("Calendario")}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                activeSection === "Calendario"
+                  ? "bg-zinc-900 text-white"
+                  : "text-zinc-600 hover:bg-zinc-100"
+              }`}
+            >
+              <span className="w-5 text-center">📅</span>
+              Calendario
+            </button>
 
-                {label}
-              </button>
-            ))}
+            <button
+              onClick={() => setActiveSection("Tareas")}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                activeSection === "Tareas"
+                  ? "bg-zinc-900 text-white"
+                  : "text-zinc-600 hover:bg-zinc-100"
+              }`}
+            >
+              <span className="w-5 text-center">✓</span>
+              Tareas
+            </button>
           </nav>
 
           <div className="mt-auto border-t border-zinc-100 pt-5">
@@ -286,9 +242,7 @@ export default function Home() {
               Retail
             </div>
 
-            <div className="font-semibold">
-              Calendar
-            </div>
+            <div className="font-semibold">Calendar</div>
           </div>
 
           <button
@@ -372,20 +326,6 @@ export default function Home() {
                 {/* FILTERS */}
                 <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm sm:flex-row">
                   <select
-                    value={selectedStore}
-                    onChange={(event) =>
-                      setSelectedStore(event.target.value)
-                    }
-                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
-                  >
-                    {stores.map((store) => (
-                      <option key={store}>
-                        {store}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
                     value={selectedCategory}
                     onChange={(event) =>
                       setSelectedCategory(event.target.value)
@@ -393,13 +333,13 @@ export default function Home() {
                     className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
                   >
                     {categories.map((category) => (
-                      <option key={category}>
-                        {category}
-                      </option>
+                      <option key={category}>{category}</option>
                     ))}
                   </select>
 
-                  <div className="hidden flex-1 sm:block" />
+                  <div className="flex flex-1 items-center px-2 text-xs text-zinc-400">
+                    Todas las tiendas · Calendario global
+                  </div>
 
                   <div className="flex items-center gap-2 px-2 text-xs text-zinc-400">
                     Agosto 2026
@@ -410,12 +350,10 @@ export default function Home() {
                 <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
                   <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
                     <div>
-                      <h2 className="font-semibold">
-                        Agosto 2026
-                      </h2>
+                      <h2 className="font-semibold">Agosto 2026</h2>
 
                       <p className="text-xs text-zinc-400">
-                        Vista mensual · HQ
+                        Vista mensual · Todas las tiendas
                       </p>
                     </div>
 
@@ -493,7 +431,10 @@ export default function Home() {
                                     </div>
 
                                     <div className="mt-1 text-[10px] text-zinc-400">
-                                      {task.stores} tiendas
+                                      {task.stores}{" "}
+                                      {task.stores === 1
+                                        ? "tienda"
+                                        : "tiendas"}
                                     </div>
 
                                     <Status status={task.status} />
@@ -518,9 +459,6 @@ export default function Home() {
                 onCreate={() => setShowModal(true)}
               />
             )}
-
-            {/* TIENDAS */}
-            {activeSection === "Tiendas" && <StoreList />}
           </div>
         </section>
       </div>
@@ -536,7 +474,7 @@ export default function Home() {
                 </h2>
 
                 <p className="mt-1 text-sm text-zinc-500">
-                  Crea una tarea para una o varias tiendas.
+                  Crea una tarea para todas las tiendas.
                 </p>
               </div>
 
@@ -596,56 +534,28 @@ export default function Home() {
                     className="input"
                   >
                     {categories.slice(1).map((category) => (
-                      <option key={category}>
-                        {category}
-                      </option>
+                      <option key={category}>{category}</option>
                     ))}
                   </select>
                 </Field>
               </div>
 
-              {/* TIENDAS */}
-              <Field label="Tiendas">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {stores.slice(1).map((store) => {
-                    const selected = newStores.includes(store);
+              {/* NUMERO DE TIENDAS */}
+              <Field label="Número de tiendas">
+                <input
+                  type="number"
+                  min="1"
+                  value={newStores}
+                  onChange={(event) =>
+                    setNewStores(event.target.value)
+                  }
+                  className="input"
+                />
 
-                    return (
-                      <button
-                        key={store}
-                        type="button"
-                        onClick={() => toggleStore(store)}
-                        className={`rounded-xl border p-3 text-left text-sm transition ${
-                          selected
-                            ? "border-zinc-900 bg-zinc-900 text-white"
-                            : "border-zinc-200 hover:border-zinc-400"
-                        }`}
-                      >
-                        <div className="font-medium">
-                          {store}
-                        </div>
-
-                        <div
-                          className={`mt-1 text-xs ${
-                            selected
-                              ? "text-zinc-300"
-                              : "text-zinc-400"
-                          }`}
-                        >
-                          {selected
-                            ? "Seleccionada"
-                            : "Seleccionar tienda"}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {newStores.length === 0 && (
-                  <p className="mt-2 text-xs text-zinc-400">
-                    Si no seleccionas ninguna tienda, se guardará 1 tienda por defecto.
-                  </p>
-                )}
+                <p className="mt-2 text-xs text-zinc-400">
+                  En el MVP no se seleccionan tiendas concretas.
+                  Solo indicamos a cuántas tiendas afecta la tarea.
+                </p>
               </Field>
 
               {/* BOTONES */}
@@ -705,8 +615,10 @@ export default function Home() {
               />
 
               <DetailRow
-                label="Tiendas asignadas"
-                value={`${selectedTask.stores} tiendas`}
+                label="Tiendas afectadas"
+                value={`${selectedTask.stores} ${
+                  selectedTask.stores === 1 ? "tienda" : "tiendas"
+                }`}
               />
 
               <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
@@ -787,7 +699,7 @@ function Stat({
 function Status({
   status,
 }: {
-  status: TaskStatus;
+  status: "Pendiente" | "En progreso" | "Completada";
 }) {
   const styles = {
     Pendiente: "bg-amber-50 text-amber-700",
@@ -841,9 +753,7 @@ function DetailRow({
         {label}
       </span>
 
-      <span className="text-sm font-medium">
-        {value}
-      </span>
+      <span className="text-sm font-medium">{value}</span>
     </div>
   );
 }
@@ -864,9 +774,7 @@ function TaskList({
     <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-zinc-200 p-5">
         <div>
-          <h2 className="font-semibold">
-            Todas las tareas
-          </h2>
+          <h2 className="font-semibold">Todas las tareas</h2>
 
           <p className="mt-1 text-xs text-zinc-400">
             Gestiona las tareas creadas por HQ.
@@ -894,19 +802,17 @@ function TaskList({
               className="flex w-full items-center justify-between p-5 text-left transition hover:bg-zinc-50"
             >
               <div>
-                <div className="font-medium">
-                  {task.title}
-                </div>
+                <div className="font-medium">{task.title}</div>
 
                 <div className="mt-1 text-xs text-zinc-400">
-                  {task.category} ·{" "}
-                  {normalizeDate(task.date)}
+                  {task.category} · {normalizeDate(task.date)}
                 </div>
               </div>
 
               <div className="text-right">
                 <div className="text-xs text-zinc-400">
-                  {task.stores} tiendas
+                  {task.stores}{" "}
+                  {task.stores === 1 ? "tienda" : "tiendas"}
                 </div>
 
                 <Status status={task.status} />
@@ -918,56 +824,4 @@ function TaskList({
     </div>
   );
 }
-
-/*
- * STORE LIST
- */
-function StoreList() {
-  return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {stores.slice(1).map((store, index) => (
-        <div
-          key={store}
-          className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm"
-        >
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="text-xs font-medium uppercase tracking-wider text-zinc-400">
-                Tienda{" "}
-                {String(index + 1).padStart(2, "0")}
-              </div>
-
-              <h2 className="mt-1 font-semibold">
-                {store}
-              </h2>
-            </div>
-
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-          </div>
-
-          <div className="mt-6 grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-zinc-50 p-3">
-              <div className="text-xs text-zinc-400">
-                Tareas
-              </div>
-
-              <div className="mt-1 font-semibold">
-                12
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-zinc-50 p-3">
-              <div className="text-xs text-zinc-400">
-                Completadas
-              </div>
-
-              <div className="mt-1 font-semibold">
-                8
-              </div>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
+```
