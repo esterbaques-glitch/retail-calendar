@@ -38,15 +38,26 @@ function formatDate(year: number, month: number, day: number) {
   )}`;
 }
 
+function normalizeDate(date: string | null | undefined) {
+  if (!date) return "";
+  return String(date).slice(0, 10);
+}
+
 export default function Home() {
   const [activeSection, setActiveSection] = useState("Calendario");
+
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
-  const [selectedStore, setSelectedStore] = useState("Todas las tiendas");
-  const [selectedCategory, setSelectedCategory] = useState(
-    "Todas las categorías",
-  );
+
+  const [selectedStore, setSelectedStore] =
+    useState("Todas las tiendas");
+
+  const [selectedCategory, setSelectedCategory] =
+    useState("Todas las categorías");
+
   const [showModal, setShowModal] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  const [selectedTask, setSelectedTask] =
+    useState<Task | null>(null);
 
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
@@ -54,6 +65,9 @@ export default function Home() {
   const [newCategory, setNewCategory] = useState("Operaciones");
   const [newStores, setNewStores] = useState<string[]>([]);
 
+  /*
+   * CARGAR TAREAS DESDE LA API
+   */
   useEffect(() => {
     async function loadTasks() {
       try {
@@ -69,7 +83,7 @@ export default function Home() {
           id: task.id,
           title: task.title,
           category: task.category,
-          date: task.due_date,
+          date: normalizeDate(task.due_date),
           stores: task.stores ?? 1,
           status: task.status ?? "Pendiente",
         }));
@@ -83,12 +97,22 @@ export default function Home() {
     loadTasks();
   }, []);
 
+  /*
+   * FILTROS
+   */
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
       const categoryMatches =
         selectedCategory === "Todas las categorías" ||
         task.category === selectedCategory;
 
+      /*
+       * De momento la API devuelve el número de tiendas,
+       * no las tiendas concretas.
+       *
+       * Por eso el filtro de tienda no puede distinguir todavía
+       * Madrid, Barcelona, Valencia o Sevilla.
+       */
       const storeMatches =
         selectedStore === "Todas las tiendas" || task.stores > 0;
 
@@ -96,17 +120,26 @@ export default function Home() {
     });
   }, [tasks, selectedCategory, selectedStore]);
 
+  /*
+   * CALENDARIO AGOSTO 2026
+   */
   const daysInMonth = 31;
+
+  // Agosto de 2026 empieza en sábado.
   const firstDayOffset = 5;
 
   const calendarCells = Array.from(
     { length: firstDayOffset + daysInMonth },
     (_, index) => {
       const day = index - firstDayOffset + 1;
+
       return day > 0 && day <= daysInMonth ? day : null;
     },
   );
 
+  /*
+   * CREAR TAREA
+   */
   async function createTask() {
     if (!newTitle.trim()) return;
 
@@ -121,6 +154,11 @@ export default function Home() {
           description: newDescription.trim(),
           dueDate: newDate,
           category: newCategory,
+
+          /*
+           * De momento guardamos el número de tiendas.
+           * Si no selecciona ninguna, usamos 1.
+           */
           stores: newStores.length || 1,
         }),
       });
@@ -135,16 +173,19 @@ export default function Home() {
         id: createdTask.id,
         title: createdTask.title,
         category: createdTask.category,
-        date: createdTask.due_date,
-        stores: createdTask.stores ?? 1,
+        date: normalizeDate(createdTask.due_date),
+        stores: createdTask.stores ?? newStores.length ?? 1,
         status: createdTask.status ?? "Pendiente",
       };
 
       setTasks((current) => [...current, task]);
 
       setShowModal(false);
+
       setNewTitle("");
       setNewDescription("");
+      setNewDate("2026-08-20");
+      setNewCategory("Operaciones");
       setNewStores([]);
     } catch (error) {
       console.error(error);
@@ -152,6 +193,9 @@ export default function Home() {
     }
   }
 
+  /*
+   * SELECCIONAR / DESELECCIONAR TIENDA
+   */
   function toggleStore(store: string) {
     setNewStores((current) =>
       current.includes(store)
@@ -163,11 +207,13 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#f7f8fa] text-zinc-900">
       <div className="flex min-h-screen">
+        {/* SIDEBAR */}
         <aside className="hidden w-64 flex-col border-r border-zinc-200 bg-white px-5 py-6 md:flex">
           <div className="mb-10">
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
               Retail
             </div>
+
             <div className="mt-1 text-xl font-semibold tracking-tight">
               Calendar
             </div>
@@ -188,7 +234,10 @@ export default function Home() {
                     : "text-zinc-600 hover:bg-zinc-100"
                 }`}
               >
-                <span className="w-5 text-center">{icon}</span>
+                <span className="w-5 text-center">
+                  {icon}
+                </span>
+
                 {label}
               </button>
             ))}
@@ -204,7 +253,11 @@ export default function Home() {
               <div className="text-xs font-medium text-zinc-400">
                 HQ OPERATIONS
               </div>
-              <div className="mt-1 text-sm font-semibold">Retail HQ</div>
+
+              <div className="mt-1 text-sm font-semibold">
+                Retail HQ
+              </div>
+
               <div className="mt-1 text-xs text-zinc-500">
                 Gestión central
               </div>
@@ -212,12 +265,16 @@ export default function Home() {
           </div>
         </aside>
 
+        {/* MOBILE HEADER */}
         <div className="fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-4 md:hidden">
           <div>
             <div className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
               Retail
             </div>
-            <div className="font-semibold">Calendar</div>
+
+            <div className="font-semibold">
+              Calendar
+            </div>
           </div>
 
           <button
@@ -228,8 +285,10 @@ export default function Home() {
           </button>
         </div>
 
+        {/* MAIN */}
         <section className="min-w-0 flex-1 px-4 pb-8 pt-20 md:px-8 md:pt-8">
           <div className="mx-auto max-w-[1500px]">
+            {/* HEADER */}
             <header className="mb-7 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
               <div>
                 <p className="text-sm font-medium text-zinc-400">
@@ -254,8 +313,10 @@ export default function Home() {
               </button>
             </header>
 
+            {/* CALENDARIO */}
             {activeSection === "Calendario" && (
               <>
+                {/* STATS */}
                 <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
                   <Stat
                     label="Tareas este mes"
@@ -266,8 +327,9 @@ export default function Home() {
                   <Stat
                     label="Pendientes"
                     value={String(
-                      tasks.filter((task) => task.status === "Pendiente")
-                        .length,
+                      tasks.filter(
+                        (task) => task.status === "Pendiente",
+                      ).length,
                     )}
                     detail="Por completar"
                   />
@@ -275,8 +337,9 @@ export default function Home() {
                   <Stat
                     label="En progreso"
                     value={String(
-                      tasks.filter((task) => task.status === "En progreso")
-                        .length,
+                      tasks.filter(
+                        (task) => task.status === "En progreso",
+                      ).length,
                     )}
                     detail="En curso"
                   />
@@ -284,13 +347,15 @@ export default function Home() {
                   <Stat
                     label="Completadas"
                     value={String(
-                      tasks.filter((task) => task.status === "Completada")
-                        .length,
+                      tasks.filter(
+                        (task) => task.status === "Completada",
+                      ).length,
                     )}
                     detail="Finalizadas"
                   />
                 </div>
 
+                {/* FILTERS */}
                 <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm sm:flex-row">
                   <select
                     value={selectedStore}
@@ -300,7 +365,9 @@ export default function Home() {
                     className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
                   >
                     {stores.map((store) => (
-                      <option key={store}>{store}</option>
+                      <option key={store}>
+                        {store}
+                      </option>
                     ))}
                   </select>
 
@@ -312,7 +379,9 @@ export default function Home() {
                     className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
                   >
                     {categories.map((category) => (
-                      <option key={category}>{category}</option>
+                      <option key={category}>
+                        {category}
+                      </option>
                     ))}
                   </select>
 
@@ -323,10 +392,14 @@ export default function Home() {
                   </div>
                 </div>
 
+                {/* CALENDAR */}
                 <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
                   <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
                     <div>
-                      <h2 className="font-semibold">Agosto 2026</h2>
+                      <h2 className="font-semibold">
+                        Agosto 2026
+                      </h2>
+
                       <p className="text-xs text-zinc-400">
                         Vista mensual · HQ
                       </p>
@@ -365,7 +438,10 @@ export default function Home() {
                         : undefined;
 
                       const dayTasks = date
-                        ? filteredTasks.filter((task) => task.date === date)
+                        ? filteredTasks.filter(
+                            (task) =>
+                              normalizeDate(task.date) === date,
+                          )
                         : [];
 
                       const isToday = day === 20;
@@ -393,7 +469,9 @@ export default function Home() {
                                 {dayTasks.map((task) => (
                                   <button
                                     key={task.id}
-                                    onClick={() => setSelectedTask(task)}
+                                    onClick={() =>
+                                      setSelectedTask(task)
+                                    }
                                     className="w-full rounded-lg border border-zinc-200 bg-zinc-50 p-2 text-left transition hover:border-zinc-400 hover:bg-white"
                                   >
                                     <div className="truncate text-xs font-semibold">
@@ -418,6 +496,7 @@ export default function Home() {
               </>
             )}
 
+            {/* TAREAS */}
             {activeSection === "Tareas" && (
               <TaskList
                 tasks={filteredTasks}
@@ -426,17 +505,21 @@ export default function Home() {
               />
             )}
 
+            {/* TIENDAS */}
             {activeSection === "Tiendas" && <StoreList />}
           </div>
         </section>
       </div>
 
+      {/* CREATE TASK MODAL */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-3xl bg-white p-6 shadow-2xl">
             <div className="mb-6 flex items-start justify-between">
               <div>
-                <h2 className="text-xl font-semibold">Nueva tarea</h2>
+                <h2 className="text-xl font-semibold">
+                  Nueva tarea
+                </h2>
 
                 <p className="mt-1 text-sm text-zinc-500">
                   Crea una tarea para una o varias tiendas.
@@ -452,15 +535,19 @@ export default function Home() {
             </div>
 
             <div className="space-y-5">
+              {/* TITULO */}
               <Field label="Título">
                 <input
                   value={newTitle}
-                  onChange={(event) => setNewTitle(event.target.value)}
+                  onChange={(event) =>
+                    setNewTitle(event.target.value)
+                  }
                   placeholder="Ej. Revisar escaparate de verano"
                   className="input"
                 />
               </Field>
 
+              {/* DESCRIPCION */}
               <Field label="Descripción">
                 <textarea
                   value={newDescription}
@@ -473,12 +560,15 @@ export default function Home() {
                 />
               </Field>
 
+              {/* FECHA Y CATEGORIA */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Fecha">
                   <input
                     type="date"
                     value={newDate}
-                    onChange={(event) => setNewDate(event.target.value)}
+                    onChange={(event) =>
+                      setNewDate(event.target.value)
+                    }
                     className="input"
                   />
                 </Field>
@@ -486,16 +576,21 @@ export default function Home() {
                 <Field label="Categoría">
                   <select
                     value={newCategory}
-                    onChange={(event) => setNewCategory(event.target.value)}
+                    onChange={(event) =>
+                      setNewCategory(event.target.value)
+                    }
                     className="input"
                   >
                     {categories.slice(1).map((category) => (
-                      <option key={category}>{category}</option>
+                      <option key={category}>
+                        {category}
+                      </option>
                     ))}
                   </select>
                 </Field>
               </div>
 
+              {/* TIENDAS */}
               <Field label="Tiendas">
                 <div className="grid gap-2 sm:grid-cols-2">
                   {stores.slice(1).map((store) => {
@@ -512,11 +607,15 @@ export default function Home() {
                             : "border-zinc-200 hover:border-zinc-400"
                         }`}
                       >
-                        <div className="font-medium">{store}</div>
+                        <div className="font-medium">
+                          {store}
+                        </div>
 
                         <div
                           className={`mt-1 text-xs ${
-                            selected ? "text-zinc-300" : "text-zinc-400"
+                            selected
+                              ? "text-zinc-300"
+                              : "text-zinc-400"
                           }`}
                         >
                           {selected
@@ -529,6 +628,7 @@ export default function Home() {
                 </div>
               </Field>
 
+              {/* BOTONES */}
               <div className="flex justify-end gap-3 border-t border-zinc-100 pt-5">
                 <button
                   onClick={() => setShowModal(false)}
@@ -550,6 +650,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* TASK DETAIL */}
       {selectedTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
@@ -573,7 +674,10 @@ export default function Home() {
             </div>
 
             <div className="mt-6 space-y-4">
-              <DetailRow label="Fecha" value={selectedTask.date} />
+              <DetailRow
+                label="Fecha"
+                value={normalizeDate(selectedTask.date)}
+              />
 
               <DetailRow
                 label="Categoría"
@@ -586,7 +690,10 @@ export default function Home() {
               />
 
               <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
-                <span className="text-sm text-zinc-500">Estado</span>
+                <span className="text-sm text-zinc-500">
+                  Estado
+                </span>
+
                 <Status status={selectedTask.status} />
               </div>
             </div>
@@ -604,6 +711,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* GLOBAL INPUT STYLE */}
       <style jsx global>{`
         .input {
           width: 100%;
@@ -624,6 +732,9 @@ export default function Home() {
   );
 }
 
+/*
+ * STAT
+ */
 function Stat({
   label,
   value,
@@ -635,15 +746,24 @@ function Stat({
 }) {
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-      <div className="text-xs font-medium text-zinc-400">{label}</div>
+      <div className="text-xs font-medium text-zinc-400">
+        {label}
+      </div>
 
-      <div className="mt-2 text-2xl font-semibold">{value}</div>
+      <div className="mt-2 text-2xl font-semibold">
+        {value}
+      </div>
 
-      <div className="mt-1 text-xs text-zinc-400">{detail}</div>
+      <div className="mt-1 text-xs text-zinc-400">
+        {detail}
+      </div>
     </div>
   );
 }
 
+/*
+ * STATUS
+ */
 function Status({
   status,
 }: {
@@ -664,6 +784,9 @@ function Status({
   );
 }
 
+/*
+ * FIELD
+ */
 function Field({
   label,
   children,
@@ -673,12 +796,18 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium">{label}</span>
+      <span className="mb-2 block text-sm font-medium">
+        {label}
+      </span>
+
       {children}
     </label>
   );
 }
 
+/*
+ * DETAIL ROW
+ */
 function DetailRow({
   label,
   value,
@@ -688,12 +817,20 @@ function DetailRow({
 }) {
   return (
     <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
-      <span className="text-sm text-zinc-500">{label}</span>
-      <span className="text-sm font-medium">{value}</span>
+      <span className="text-sm text-zinc-500">
+        {label}
+      </span>
+
+      <span className="text-sm font-medium">
+        {value}
+      </span>
     </div>
   );
 }
 
+/*
+ * TASK LIST
+ */
 function TaskList({
   tasks,
   onSelect,
@@ -707,7 +844,9 @@ function TaskList({
     <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-zinc-200 p-5">
         <div>
-          <h2 className="font-semibold">Todas las tareas</h2>
+          <h2 className="font-semibold">
+            Todas las tareas
+          </h2>
 
           <p className="mt-1 text-xs text-zinc-400">
             Gestiona las tareas creadas por HQ.
@@ -735,10 +874,13 @@ function TaskList({
               className="flex w-full items-center justify-between p-5 text-left transition hover:bg-zinc-50"
             >
               <div>
-                <div className="font-medium">{task.title}</div>
+                <div className="font-medium">
+                  {task.title}
+                </div>
 
                 <div className="mt-1 text-xs text-zinc-400">
-                  {task.category} · {task.date}
+                  {task.category} ·{" "}
+                  {normalizeDate(task.date)}
                 </div>
               </div>
 
@@ -757,6 +899,9 @@ function TaskList({
   );
 }
 
+/*
+ * STORE LIST
+ */
 function StoreList() {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -768,10 +913,13 @@ function StoreList() {
           <div className="flex items-start justify-between">
             <div>
               <div className="text-xs font-medium uppercase tracking-wider text-zinc-400">
-                Tienda {String(index + 1).padStart(2, "0")}
+                Tienda{" "}
+                {String(index + 1).padStart(2, "0")}
               </div>
 
-              <h2 className="mt-1 font-semibold">{store}</h2>
+              <h2 className="mt-1 font-semibold">
+                {store}
+              </h2>
             </div>
 
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
@@ -779,15 +927,23 @@ function StoreList() {
 
           <div className="mt-6 grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-zinc-50 p-3">
-              <div className="text-xs text-zinc-400">Tareas</div>
+              <div className="text-xs text-zinc-400">
+                Tareas
+              </div>
 
-              <div className="mt-1 font-semibold">12</div>
+              <div className="mt-1 font-semibold">
+                12
+              </div>
             </div>
 
             <div className="rounded-xl bg-zinc-50 p-3">
-              <div className="text-xs text-zinc-400">Completadas</div>
+              <div className="text-xs text-zinc-400">
+                Completadas
+              </div>
 
-              <div className="mt-1 font-semibold">8</div>
+              <div className="mt-1 font-semibold">
+                8
+              </div>
             </div>
           </div>
         </div>
