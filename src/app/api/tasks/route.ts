@@ -110,3 +110,65 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+
+    const { id, status } = body;
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "El ID de la tarea es obligatorio" },
+        { status: 400 },
+      );
+    }
+
+    const validStatuses = [
+      "Pendiente",
+      "En progreso",
+      "Completada",
+    ];
+
+    if (!validStatuses.includes(status)) {
+      return NextResponse.json(
+        { error: "Estado no válido" },
+        { status: 400 },
+      );
+    }
+
+    const result = await sql`
+      UPDATE tasks
+      SET
+        status = ${status},
+        updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING
+        id,
+        title,
+        description,
+        due_date,
+        category,
+        stores,
+        status,
+        created_at,
+        updated_at
+    `;
+
+    if (result.length === 0) {
+      return NextResponse.json(
+        { error: "Tarea no encontrada" },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json(result[0]);
+  } catch (error) {
+    console.error("Error updating task:", error);
+
+    return NextResponse.json(
+      { error: "No se pudo actualizar la tarea" },
+      { status: 500 },
+    );
+  }
+}
