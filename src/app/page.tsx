@@ -2,13 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+type TaskStatus = "Pendiente" | "En progreso" | "Completada";
+
 type Task = {
   id: number;
   title: string;
   category: string;
   date: string;
   stores: number;
-  status: "Pendiente" | "En progreso" | "Completada";
+  status: TaskStatus;
 };
 
 const initialTasks: Task[] = [];
@@ -41,6 +43,18 @@ function formatDate(year: number, month: number, day: number) {
 function normalizeDate(date: string | null | undefined) {
   if (!date) return "";
   return String(date).slice(0, 10);
+}
+
+function normalizeStatus(status: string | null | undefined): TaskStatus {
+  if (
+    status === "Pendiente" ||
+    status === "En progreso" ||
+    status === "Completada"
+  ) {
+    return status;
+  }
+
+  return "Pendiente";
 }
 
 export default function Home() {
@@ -84,8 +98,8 @@ export default function Home() {
           title: task.title,
           category: task.category,
           date: normalizeDate(task.due_date),
-          stores: task.stores ?? 1,
-          status: task.status ?? "Pendiente",
+          stores: Number(task.stores) || 1,
+          status: normalizeStatus(task.status),
         }));
 
         setTasks(loadedTasks);
@@ -107,14 +121,17 @@ export default function Home() {
         task.category === selectedCategory;
 
       /*
-       * De momento la API devuelve el número de tiendas,
-       * no las tiendas concretas.
+       * La base de datos guarda actualmente el número
+       * de tiendas asignadas a cada tarea.
        *
-       * Por eso el filtro de tienda no puede distinguir todavía
-       * Madrid, Barcelona, Valencia o Sevilla.
+       * Por tanto, mientras no tengamos una relación
+       * entre tareas y tiendas concretas, el filtro de
+       * tienda solo puede comprobar si la tarea tiene
+       * alguna tienda asignada.
        */
       const storeMatches =
-        selectedStore === "Todas las tiendas" || task.stores > 0;
+        selectedStore === "Todas las tiendas" ||
+        task.stores > 0;
 
       return categoryMatches && storeMatches;
     });
@@ -155,10 +172,7 @@ export default function Home() {
           dueDate: newDate,
           category: newCategory,
 
-          /*
-           * De momento guardamos el número de tiendas.
-           * Si no selecciona ninguna, usamos 1.
-           */
+          // Guardamos en la BD el número de tiendas seleccionadas.
           stores: newStores.length || 1,
         }),
       });
@@ -174,8 +188,8 @@ export default function Home() {
         title: createdTask.title,
         category: createdTask.category,
         date: normalizeDate(createdTask.due_date),
-        stores: createdTask.stores ?? newStores.length ?? 1,
-        status: createdTask.status ?? "Pendiente",
+        stores: Number(createdTask.stores) || 1,
+        status: normalizeStatus(createdTask.status),
       };
 
       setTasks((current) => [...current, task]);
@@ -188,7 +202,7 @@ export default function Home() {
       setNewCategory("Operaciones");
       setNewStores([]);
     } catch (error) {
-      console.error(error);
+      console.error("Error creando tarea:", error);
       alert("No se pudo crear la tarea");
     }
   }
@@ -626,6 +640,12 @@ export default function Home() {
                     );
                   })}
                 </div>
+
+                {newStores.length === 0 && (
+                  <p className="mt-2 text-xs text-zinc-400">
+                    Si no seleccionas ninguna tienda, se guardará 1 tienda por defecto.
+                  </p>
+                )}
               </Field>
 
               {/* BOTONES */}
@@ -767,7 +787,7 @@ function Stat({
 function Status({
   status,
 }: {
-  status: "Pendiente" | "En progreso" | "Completada";
+  status: TaskStatus;
 }) {
   const styles = {
     Pendiente: "bg-amber-50 text-amber-700",
