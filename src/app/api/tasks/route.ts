@@ -10,6 +10,8 @@ export async function GET() {
         description,
         due_date,
         category,
+        stores,
+        status,
         created_at,
         updated_at
       FROM tasks
@@ -37,6 +39,7 @@ export async function POST(request: Request) {
       dueDate,
       category,
       stores = 1,
+      status = "Pendiente",
     } = body;
 
     if (!title?.trim()) {
@@ -46,18 +49,44 @@ export async function POST(request: Request) {
       );
     }
 
+    const validStatuses = [
+      "Pendiente",
+      "En progreso",
+      "Completada",
+    ];
+
+    if (!validStatuses.includes(status)) {
+      return NextResponse.json(
+        { error: "Estado no válido" },
+        { status: 400 },
+      );
+    }
+
+    const storesCount = Number(stores);
+
+    if (!Number.isInteger(storesCount) || storesCount < 1) {
+      return NextResponse.json(
+        { error: "El número de tiendas no es válido" },
+        { status: 400 },
+      );
+    }
+
     const result = await sql`
       INSERT INTO tasks (
         title,
         description,
         due_date,
-        category
+        category,
+        stores,
+        status
       )
       VALUES (
         ${title.trim()},
         ${description?.trim() || null},
         ${dueDate || null},
-        ${category || "Operaciones"}
+        ${category || "Operaciones"},
+        ${storesCount},
+        ${status}
       )
       RETURNING
         id,
@@ -65,18 +94,13 @@ export async function POST(request: Request) {
         description,
         due_date,
         category,
+        stores,
+        status,
         created_at,
         updated_at
     `;
 
-    return NextResponse.json(
-      {
-        ...result[0],
-        stores,
-        status: "Pendiente",
-      },
-      { status: 201 },
-    );
+    return NextResponse.json(result[0], { status: 201 });
   } catch (error) {
     console.error("Error creating task:", error);
 
