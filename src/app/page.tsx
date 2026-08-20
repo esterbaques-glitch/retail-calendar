@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Task = {
   id: number;
@@ -11,32 +11,7 @@ type Task = {
   status: "Pendiente" | "En progreso" | "Completada";
 };
 
-const initialTasks: Task[] = [
-  {
-    id: 1,
-    title: "Revisar escaparate",
-    category: "Visual Merchandising",
-    date: "2026-08-20",
-    stores: 12,
-    status: "En progreso",
-  },
-  {
-    id: 2,
-    title: "Campaña vuelta al cole",
-    category: "Marketing",
-    date: "2026-08-25",
-    stores: 8,
-    status: "Pendiente",
-  },
-  {
-    id: 3,
-    title: "Actualizar cartelería",
-    category: "Operaciones",
-    date: "2026-08-28",
-    stores: 5,
-    status: "Completada",
-  },
-];
+const initialTasks: Task[] = [];
 
 const stores = [
   "Todas las tiendas",
@@ -79,18 +54,51 @@ export default function Home() {
   const [newCategory, setNewCategory] = useState("Operaciones");
   const [newStores, setNewStores] = useState<string[]>([]);
 
+  useEffect(() => {
+    async function loadTasks() {
+      try {
+        const response = await fetch("/api/tasks");
+
+        if (!response.ok) {
+          throw new Error("No se pudieron cargar las tareas");
+        }
+
+        const data = await response.json();
+
+        const loadedTasks: Task[] = data.map((task: any) => ({
+          id: task.id,
+          title: task.title,
+          category: task.category,
+          date: task.due_date,
+          stores: task.stores ?? 1,
+          status: task.status ?? "Pendiente",
+        }));
+
+        setTasks(loadedTasks);
+      } catch (error) {
+        console.error("Error cargando tareas:", error);
+      }
+    }
+
+    loadTasks();
+  }, []);
+
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
       const categoryMatches =
         selectedCategory === "Todas las categorías" ||
         task.category === selectedCategory;
 
-      return categoryMatches;
+      const storeMatches =
+        selectedStore === "Todas las tiendas" || task.stores > 0;
+
+      return categoryMatches && storeMatches;
     });
-  }, [tasks, selectedCategory]);
+  }, [tasks, selectedCategory, selectedStore]);
 
   const daysInMonth = 31;
-  const firstDayOffset = 5; // Agosto 2026 empieza en sábado.
+  const firstDayOffset = 5;
+
   const calendarCells = Array.from(
     { length: firstDayOffset + daysInMonth },
     (_, index) => {
@@ -99,23 +107,49 @@ export default function Home() {
     },
   );
 
-  function createTask() {
+  async function createTask() {
     if (!newTitle.trim()) return;
 
-    const newTask: Task = {
-      id: Date.now(),
-      title: newTitle.trim(),
-      category: newCategory,
-      date: newDate,
-      stores: newStores.length || 1,
-      status: "Pendiente",
-    };
+    try {
+      const response = await fetch("/api/tasks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: newTitle.trim(),
+          description: newDescription.trim(),
+          dueDate: newDate,
+          category: newCategory,
+          stores: newStores.length || 1,
+        }),
+      });
 
-    setTasks((current) => [...current, newTask]);
-    setShowModal(false);
-    setNewTitle("");
-    setNewDescription("");
-    setNewStores([]);
+      if (!response.ok) {
+        throw new Error("No se pudo crear la tarea");
+      }
+
+      const createdTask = await response.json();
+
+      const task: Task = {
+        id: createdTask.id,
+        title: createdTask.title,
+        category: createdTask.category,
+        date: createdTask.due_date,
+        stores: createdTask.stores ?? 1,
+        status: createdTask.status ?? "Pendiente",
+      };
+
+      setTasks((current) => [...current, task]);
+
+      setShowModal(false);
+      setNewTitle("");
+      setNewDescription("");
+      setNewStores([]);
+    } catch (error) {
+      console.error(error);
+      alert("No se pudo crear la tarea");
+    }
   }
 
   function toggleStore(store: string) {
@@ -129,7 +163,6 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#f7f8fa] text-zinc-900">
       <div className="flex min-h-screen">
-        {/* SIDEBAR */}
         <aside className="hidden w-64 flex-col border-r border-zinc-200 bg-white px-5 py-6 md:flex">
           <div className="mb-10">
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
@@ -179,7 +212,6 @@ export default function Home() {
           </div>
         </aside>
 
-        {/* MOBILE HEADER */}
         <div className="fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-4 md:hidden">
           <div>
             <div className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
@@ -196,18 +228,18 @@ export default function Home() {
           </button>
         </div>
 
-        {/* MAIN */}
         <section className="min-w-0 flex-1 px-4 pb-8 pt-20 md:px-8 md:pt-8">
           <div className="mx-auto max-w-[1500px]">
-            {/* HEADER */}
             <header className="mb-7 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
               <div>
                 <p className="text-sm font-medium text-zinc-400">
                   HQ Operations
                 </p>
+
                 <h1 className="mt-1 text-3xl font-semibold tracking-tight">
                   {activeSection}
                 </h1>
+
                 <p className="mt-2 text-sm text-zinc-500">
                   Gestiona las tareas de todas las tiendas desde un único
                   calendario.
@@ -224,13 +256,13 @@ export default function Home() {
 
             {activeSection === "Calendario" && (
               <>
-                {/* STATS */}
                 <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
                   <Stat
                     label="Tareas este mes"
                     value={String(tasks.length)}
                     detail="Total"
                   />
+
                   <Stat
                     label="Pendientes"
                     value={String(
@@ -239,6 +271,7 @@ export default function Home() {
                     )}
                     detail="Por completar"
                   />
+
                   <Stat
                     label="En progreso"
                     value={String(
@@ -247,6 +280,7 @@ export default function Home() {
                     )}
                     detail="En curso"
                   />
+
                   <Stat
                     label="Completadas"
                     value={String(
@@ -257,7 +291,6 @@ export default function Home() {
                   />
                 </div>
 
-                {/* FILTERS */}
                 <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm sm:flex-row">
                   <select
                     value={selectedStore}
@@ -290,7 +323,6 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* CALENDAR */}
                 <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
                   <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
                     <div>
@@ -304,9 +336,11 @@ export default function Home() {
                       <button className="rounded-lg border border-zinc-200 px-3 py-1.5 text-sm hover:bg-zinc-50">
                         ←
                       </button>
+
                       <button className="rounded-lg border border-zinc-200 px-3 py-1.5 text-sm hover:bg-zinc-50">
                         Hoy
                       </button>
+
                       <button className="rounded-lg border border-zinc-200 px-3 py-1.5 text-sm hover:bg-zinc-50">
                         →
                       </button>
@@ -365,9 +399,11 @@ export default function Home() {
                                     <div className="truncate text-xs font-semibold">
                                       {task.title}
                                     </div>
+
                                     <div className="mt-1 text-[10px] text-zinc-400">
                                       {task.stores} tiendas
                                     </div>
+
                                     <Status status={task.status} />
                                   </button>
                                 ))}
@@ -395,13 +431,13 @@ export default function Home() {
         </section>
       </div>
 
-      {/* CREATE TASK MODAL */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-3xl bg-white p-6 shadow-2xl">
             <div className="mb-6 flex items-start justify-between">
               <div>
                 <h2 className="text-xl font-semibold">Nueva tarea</h2>
+
                 <p className="mt-1 text-sm text-zinc-500">
                   Crea una tarea para una o varias tiendas.
                 </p>
@@ -477,12 +513,15 @@ export default function Home() {
                         }`}
                       >
                         <div className="font-medium">{store}</div>
+
                         <div
                           className={`mt-1 text-xs ${
                             selected ? "text-zinc-300" : "text-zinc-400"
                           }`}
                         >
-                          {selected ? "Seleccionada" : "Seleccionar tienda"}
+                          {selected
+                            ? "Seleccionada"
+                            : "Seleccionar tienda"}
                         </div>
                       </button>
                     );
@@ -511,7 +550,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* TASK DETAIL */}
       {selectedTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
@@ -520,6 +558,7 @@ export default function Home() {
                 <div className="text-xs font-medium uppercase tracking-wider text-zinc-400">
                   Tarea HQ
                 </div>
+
                 <h2 className="mt-1 text-xl font-semibold">
                   {selectedTask.title}
                 </h2>
@@ -535,11 +574,17 @@ export default function Home() {
 
             <div className="mt-6 space-y-4">
               <DetailRow label="Fecha" value={selectedTask.date} />
-              <DetailRow label="Categoría" value={selectedTask.category} />
+
+              <DetailRow
+                label="Categoría"
+                value={selectedTask.category}
+              />
+
               <DetailRow
                 label="Tiendas asignadas"
                 value={`${selectedTask.stores} tiendas`}
               />
+
               <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
                 <span className="text-sm text-zinc-500">Estado</span>
                 <Status status={selectedTask.status} />
@@ -550,6 +595,7 @@ export default function Home() {
               <button className="rounded-xl border border-zinc-200 py-3 text-sm font-medium hover:bg-zinc-50">
                 💬 Comentarios
               </button>
+
               <button className="rounded-xl border border-zinc-200 py-3 text-sm font-medium hover:bg-zinc-50">
                 📎 Documentos
               </button>
@@ -590,7 +636,9 @@ function Stat({
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
       <div className="text-xs font-medium text-zinc-400">{label}</div>
+
       <div className="mt-2 text-2xl font-semibold">{value}</div>
+
       <div className="mt-1 text-xs text-zinc-400">{detail}</div>
     </div>
   );
@@ -631,7 +679,13 @@ function Field({
   );
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
   return (
     <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
       <span className="text-sm text-zinc-500">{label}</span>
@@ -654,6 +708,7 @@ function TaskList({
       <div className="flex items-center justify-between border-b border-zinc-200 p-5">
         <div>
           <h2 className="font-semibold">Todas las tareas</h2>
+
           <p className="mt-1 text-xs text-zinc-400">
             Gestiona las tareas creadas por HQ.
           </p>
@@ -668,27 +723,35 @@ function TaskList({
       </div>
 
       <div className="divide-y divide-zinc-100">
-        {tasks.map((task) => (
-          <button
-            key={task.id}
-            onClick={() => onSelect(task)}
-            className="flex w-full items-center justify-between p-5 text-left transition hover:bg-zinc-50"
-          >
-            <div>
-              <div className="font-medium">{task.title}</div>
-              <div className="mt-1 text-xs text-zinc-400">
-                {task.category} · {task.date}
-              </div>
-            </div>
+        {tasks.length === 0 ? (
+          <div className="p-8 text-center text-sm text-zinc-400">
+            No hay tareas todavía.
+          </div>
+        ) : (
+          tasks.map((task) => (
+            <button
+              key={task.id}
+              onClick={() => onSelect(task)}
+              className="flex w-full items-center justify-between p-5 text-left transition hover:bg-zinc-50"
+            >
+              <div>
+                <div className="font-medium">{task.title}</div>
 
-            <div className="text-right">
-              <div className="text-xs text-zinc-400">
-                {task.stores} tiendas
+                <div className="mt-1 text-xs text-zinc-400">
+                  {task.category} · {task.date}
+                </div>
               </div>
-              <Status status={task.status} />
-            </div>
-          </button>
-        ))}
+
+              <div className="text-right">
+                <div className="text-xs text-zinc-400">
+                  {task.stores} tiendas
+                </div>
+
+                <Status status={task.status} />
+              </div>
+            </button>
+          ))
+        )}
       </div>
     </div>
   );
@@ -707,6 +770,7 @@ function StoreList() {
               <div className="text-xs font-medium uppercase tracking-wider text-zinc-400">
                 Tienda {String(index + 1).padStart(2, "0")}
               </div>
+
               <h2 className="mt-1 font-semibold">{store}</h2>
             </div>
 
@@ -716,10 +780,13 @@ function StoreList() {
           <div className="mt-6 grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-zinc-50 p-3">
               <div className="text-xs text-zinc-400">Tareas</div>
+
               <div className="mt-1 font-semibold">12</div>
             </div>
+
             <div className="rounded-xl bg-zinc-50 p-3">
               <div className="text-xs text-zinc-400">Completadas</div>
+
               <div className="mt-1 font-semibold">8</div>
             </div>
           </div>
